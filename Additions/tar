@@ -1,0 +1,69 @@
+--[[ MADE BY COLUMNA1 PLEASE DONT DISTRIBUTE WITHOUT PERMISSION ]]--
+
+--update code
+local err = true
+
+local arg = {...}
+
+local function unPack()
+  local blank = 0
+  local block = 0
+  local curbyte = 0
+  local file = fs.open("OS.tar","rb")
+  
+  local function readByte() curbyte = curbyte + 1 if curbyte == 512 then curbyte = 0 ; block = block + 1 end return file:read(1) end
+  local function readString(num) local str = "" ; for i = 1,num do local byt = readByte() ; if byt ~= 0 then str = str..string.char(byt) end end; return str end
+  local function readBytes(num) local tab = {} ; for i = 1,num do tab[#tab+1] = readByte() end return tab end
+  --function octal_bytes_to_int(str,size) size = size + 1 ; local out = 0 ; local pos = size - 1 ; while pos > 0 do if str[size-pos] ~= 32 and str[size-pos] ~= 0 then out = out * 8 + tonumber(string.char(str[size-pos])) end pos = pos - 1 end return out end
+  local function octal_to_int(str,size) return tonumber(str:sub(0,size),8) or "" end
+  local function afterFileSkip() if curbyte > 0 then readString(512-curbyte) ; curbyte = 0 ; block = block + 1 end end
+  local function dumpFile(nam,size) local fi = fs.open("/"..nam,"wb") if not fi then print("ERROR NO FILE") end for i = 1,size do fi.write(readByte()) end fi.close() ; afterFileSkip() end
+
+  --read headder
+  local dump = ""
+  local function readFileHeader()
+    local name = readString(100)
+    local mode = readBytes(8)
+    local uid = readBytes(8)
+    local gid = readBytes(8)
+    local size = readString(12)
+    local mtime = readBytes(12)
+    local chksum = readBytes(8)
+    local linkflag = readByte()
+    local linkname = readString(100)
+    local magic = readBytes(6)
+    local version = readBytes(2)
+    local uname = readString(32)
+    local gname = readString(32)
+    local devmajor = readBytes(8)
+    local devminor = readBytes(8)
+    afterFileSkip()
+    if tonumber(string.char(linkflag)) == 5 and not fs.exists("/"..name) then
+      fs.makeDir("/"..name)
+    elseif tonumber(string.char(linkflag)) == 0 then
+      dumpFile(name,octal_to_int(size,11))
+    end
+    local gotit = false
+    if name == "" and uname == "" and gname == "" then
+      gotit = true
+      if blank == 0 then
+        blank = 1
+      elseif blank == 1 then
+        blank = 2
+      end
+    end
+    if gotit == false then
+      blank = 0
+    end
+    name = ""
+  end
+  blank = 0
+  while blank ~=2 do
+    readFileHeader()
+    --os.pullEvent()
+    sleep(0.05)
+  end
+  file.close()
+end
+
+unPack()
